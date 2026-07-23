@@ -1,9 +1,68 @@
-import { Link } from 'react-router-dom'
+import { useCallback, useEffect, useState } from 'react'
+import ErrorMessage from './ErrorMessage'
+import RepoCard from './RepoCard'
+import Spinner from './Spinner'
 
-const projects = [['01', 'Personal Portfolio', 'A responsive personal portfolio made with React and CSS.'], ['02', 'Landing Page', 'A clean landing page with a hero section and call-to-action buttons.'], ['03', 'Contact Form', 'A friendly contact form design with accessible input fields.']]
+const REPOSITORIES_URL = 'https://api.github.com/users/Princypatel777/repos'
 
 function Projects() {
-  return <section className="section"><div className="section-heading"><p className="eyebrow">My Work</p><h2>Projects</h2></div><div className="projects-grid">{projects.map(([number, title, description]) => <article className="project-card" key={number}><span className="project-number">{number}</span><h3>{title}</h3><p>{description}</p><Link to="/contact">Discuss this project &rarr;</Link></article>)}</div></section>
+  const [repos, setRepos] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [searchTerm, setSearchTerm] = useState('')
+
+  const fetchRepositories = useCallback(async () => {
+    setLoading(true)
+    setError('')
+
+    try {
+      const response = await fetch(REPOSITORIES_URL)
+
+      if (!response.ok) {
+        throw new Error('Unable to load repositories.')
+      }
+
+      const repositoryData = await response.json()
+      setRepos(repositoryData)
+    } catch {
+      setError('Unable to load repositories. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchRepositories()
+  }, [fetchRepositories])
+
+  const filteredRepos = repos.filter((repo) =>
+    repo.name?.toLowerCase().includes(searchTerm.toLowerCase()),
+  )
+
+  return (
+    <section className="section">
+      <div className="section-heading">
+        <p className="eyebrow">My Work</p>
+        <h2>Projects</h2>
+      </div>
+
+      <input
+        aria-label="Search repositories"
+        onChange={(event) => setSearchTerm(event.target.value)}
+        placeholder="Search repositories..."
+        type="search"
+        value={searchTerm}
+      />
+
+      {loading && <Spinner />}
+      {!loading && error && <ErrorMessage message={error} onRetry={fetchRepositories} />}
+      {!loading && !error && (
+        <div className="projects-grid">
+          {filteredRepos.map((repo) => <RepoCard key={repo.id} repo={repo} />)}
+        </div>
+      )}
+    </section>
+  )
 }
 
 export default Projects
