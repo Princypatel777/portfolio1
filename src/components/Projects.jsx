@@ -46,13 +46,15 @@ function Projects() {
         <h2>Projects</h2>
       </div>
 
-      <input
-        aria-label="Search repositories"
-        onChange={(event) => setSearchTerm(event.target.value)}
-        placeholder="Search repositories..."
-        type="search"
-        value={searchTerm}
-      />
+      <div className="contact-form" style={{ margin: '0 auto 34px' }}>
+        <input
+          aria-label="Search repositories"
+          onChange={(event) => setSearchTerm(event.target.value)}
+          placeholder="Search repositories..."
+          type="search"
+          value={searchTerm}
+        />
+      </div>
 
       {loading && <Spinner />}
       {!loading && error && <ErrorMessage message={error} onRetry={fetchRepositories} />}
