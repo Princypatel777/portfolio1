@@ -7,6 +7,7 @@ import Home from './components/Home'
 import NavBar from './components/NavBar'
 import NotFound from './components/NotFound'
 import Projects from './components/Projects'
+import TaskManager from './components/TaskManager'
 
 function App() {
   const [isDarkMode, setIsDarkMode] = useState(false)
@@ -18,6 +19,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/projects" element={<Projects />} />
+          <Route path="/tasks" element={<TaskManager />} />
           <Route path="/contact" element={<Contact email="princypatel7299@gmail.com" />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
