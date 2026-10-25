@@ -1,4 +1,6 @@
 const express = require('express')
+const taskEvents = require('./events')
+require('./listeners')
 
 const app = express()
 const PORT = process.env.PORT || 5000
@@ -46,7 +48,7 @@ app.get('/tasks/:id', validateTaskId, (req, res) => {
 })
 
 app.post('/tasks', (req, res) => {
-  const { title } = req.body
+  const { title, description, assignedTo, assignedUser, simulateError } = req.body
 
   if (typeof title !== 'string' || title.trim() === '') {
     return res.status(400).json({ error: 'Title is required and must be a non-empty string' })
@@ -55,12 +57,21 @@ app.post('/tasks', (req, res) => {
   const task = {
     id: Date.now(),
     title: title.trim(),
+    description: typeof description === 'string' ? description.trim() : '',
+    assignedTo: typeof assignedTo === 'string' ? assignedTo.trim() : (typeof assignedUser === 'string' ? assignedUser.trim() : 'Unassigned'),
     completed: false,
     createdAt: new Date().toISOString(),
+    ...(simulateError ? { simulateError: true } : {})
   }
 
   tasks.push(task)
+
+  // API responds immediately
+  console.log(`[API] Response sent at ${new Date().toISOString()}`)
   res.status(201).json({ message: 'Task created', task })
+
+  // Emit task-created event asynchronously handled by background listener
+  taskEvents.emit('task-created', task)
 })
 
 app.put('/tasks/:id', validateTaskId, (req, res) => {
@@ -91,7 +102,11 @@ app.delete('/tasks/:id', validateTaskId, (req, res) => {
   const taskIndex = tasks.findIndex((item) => item.id === req.task.id)
   const [deletedTask] = tasks.splice(taskIndex, 1)
 
+  console.log(`[API] Delete response sent at ${new Date().toISOString()}`)
   res.status(200).json({ message: 'Task deleted', task: deletedTask })
+
+  // Emit task-deleted event asynchronously handled by background listener
+  taskEvents.emit('task-deleted', deletedTask)
 })
 
 app.use((req, res) => {
