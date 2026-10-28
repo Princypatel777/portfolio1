@@ -12,10 +12,14 @@
   "keywords": [
     "express",
     "rest-api",
-    "task-manager"
+    "task-manager",
+    "docker",
+    "mongodb",
+    "mongoose"
   ],
   "license": "ISC",
   "dependencies": {
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "mongoose": "^8.2.0"
   }
 }
