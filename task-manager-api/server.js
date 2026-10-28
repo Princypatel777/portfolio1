@@ -11,16 +11,6 @@ app.use((req, res, next) => {
   next()
 })
 
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*')
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization')
-  if (req.method === 'OPTIONS') {
-    return res.sendStatus(200)
-  }
-  next()
-})
-
 app.use(express.json())
 
 app.use((req, res, next) => {
@@ -35,8 +25,11 @@ app.use((req, res, next) => {
 })
 
 function validateTaskId(req, res, next) {
-  const paramId = String(req.params.id)
-  const task = tasks.find((item) => String(item.id) === paramId || String(item._id) === paramId)
+  if (!/^\d+$/.test(req.params.id)) {
+    return res.status(400).json({ error: 'Task ID must be a number' })
+  }
+
+  const task = tasks.find((item) => item.id === Number(req.params.id))
 
   if (!task) {
     return res.status(404).json({ error: 'Task not found' })
@@ -61,10 +54,8 @@ app.post('/tasks', (req, res) => {
     return res.status(400).json({ error: 'Title is required and must be a non-empty string' })
   }
 
-  const id = Date.now()
   const task = {
-    id,
-    _id: String(id),
+    id: Date.now(),
     title: title.trim(),
     description: typeof description === 'string' ? description.trim() : '',
     assignedTo: typeof assignedTo === 'string' ? assignedTo.trim() : (typeof assignedUser === 'string' ? assignedUser.trim() : 'Unassigned'),
