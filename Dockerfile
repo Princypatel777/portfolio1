@@ -1,8 +1,8 @@
 # ==============================================================================
 # Practical 11: Task Management Frontend - React/Vite Dockerfile
-# Multi-stage build for building and serving the production bundle
+# Node 22 LTS satisfies Vite 8 + Rolldown engine requirements (styleText in node:util)
 # ==============================================================================
-FROM node:18 AS build
+FROM node:22 AS build
 
 # Set working directory inside container
 WORKDIR /app

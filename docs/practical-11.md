@@ -68,9 +68,9 @@ CMD ["node", "server.js"]
 ```
 
 ### 2. Frontend Dockerfile (`Dockerfile`)
-Containerizes the React client application and serves production preview assets:
+Containerizes the React client application and serves production preview assets (utilizing Node 22 to support Vite 8 and Rolldown's modern `node:util.styleText` requirements):
 ```dockerfile
-FROM node:18 AS build
+FROM node:22 AS build
 
 WORKDIR /app
 
@@ -220,3 +220,4 @@ docker ps
     -H "Content-Type: application/json" \
     -d "{\"title\": \"Containerized Task\", \"assignedTo\": \"Princy Patel\"}"
   ```
+
