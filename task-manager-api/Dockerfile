@@ -20,3 +20,4 @@ EXPOSE 5000
 
 # Define container runtime command
 CMD ["node", "server.js"]
+
