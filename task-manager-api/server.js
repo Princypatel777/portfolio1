@@ -13,16 +13,18 @@ const tasks = []
 let isMongoConnected = false
 
 // ==================== MongoDB Connection ====================
-mongoose
-  .connect(MONGO_URI)
-  .then(() => {
-    isMongoConnected = true
-    console.log(`[Database] Connected to MongoDB at ${MONGO_URI}`)
-  })
-  .catch((err) => {
-    isMongoConnected = false
-    console.warn(`[Database] MongoDB connection warning (${MONGO_URI}): ${err.message}. Using in-memory fallback.`)
-  })
+if (process.env.NODE_ENV !== 'test' || process.env.ENABLE_MONGO_IN_TEST === 'true') {
+  mongoose
+    .connect(MONGO_URI, { serverSelectionTimeoutMS: 2000 })
+    .then(() => {
+      isMongoConnected = true
+      console.log(`[Database] Connected to MongoDB at ${MONGO_URI}`)
+    })
+    .catch((err) => {
+      isMongoConnected = false
+      console.warn(`[Database] MongoDB connection warning (${MONGO_URI}): ${err.message}. Using in-memory fallback.`)
+    })
+}
 
 mongoose.connection.on('connected', () => {
   isMongoConnected = true

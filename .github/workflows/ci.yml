@@ -1,0 +1,62 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ----------------------------------------------------------------------------
+  # Job 1: Static Code Analysis & Linting (Supplementary Problem 1)
+  # ----------------------------------------------------------------------------
+  lint:
+    name: Code Linting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Frontend Dependencies
+        run: npm ci || npm install
+
+      - name: Run Linter (Oxlint)
+        run: npm run lint
+
+  # ----------------------------------------------------------------------------
+  # Job 2: Build & Automated Test Execution
+  # ----------------------------------------------------------------------------
+  build-and-test:
+    name: Build & Automated Tests
+    needs: lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # --- Step A: Frontend Production Build Verification ---
+      - name: Install Frontend Dependencies
+        run: npm ci || npm install
+
+      - name: Build Frontend Application
+        run: npm run build
+
+      # --- Step B: Backend Dependencies & Unit/Integration Tests ---
+      - name: Install Backend Dependencies
+        working-directory: ./task-manager-api
+        run: npm ci || npm install
+
+      - name: Run Automated API Tests (Jest & Supertest)
+        working-directory: ./task-manager-api
+        run: npm test
