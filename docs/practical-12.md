@@ -244,3 +244,4 @@ To demonstrate pipeline failure in your lab journal:
    git push origin main
    ```
 3. The GitHub Actions runner will rebuild, all tests will pass, and the workflow will display a green checkmark ✅.
+
