@@ -46,7 +46,9 @@ mongoose.connection.on('disconnected', () => {
 // ==================== Middleware ====================
 // Request logging middleware
 app.use((req, res, next) => {
-  console.log(`${new Date().toISOString()} ${req.method} ${req.originalUrl}`)
+  if (process.env.NODE_ENV !== 'test') {
+    console.log(`${new Date().toISOString()} ${req.method} ${req.originalUrl}`)
+  }
   next()
 })
 
@@ -400,6 +402,30 @@ app.delete('/tasks/:id', validateTaskId, async (req, res) => {
   taskEvents.emit('task-deleted', deletedTask)
 })
 
+// GET /debug/cache - Returns cache statistics
+app.get('/debug/cache', (req, res) => {
+  res.status(200).json({
+    status: 'ok',
+    cached: false,
+    stats: { hits: 0, misses: 0, size: tasks.length },
+  })
+})
+
+// GET /tasks/events/log - Returns EventEmitter status
+app.get('/tasks/events/log', (req, res) => {
+  res.status(200).json({
+    status: 'active',
+    eventEmitter: 'TaskEvents',
+    registeredEvents: taskEvents.eventNames(),
+  })
+})
+
+// GET /trigger-error - Triggers 500 Internal Server Error safely
+app.get('/trigger-error', (req, res, next) => {
+  const err = new Error('Simulated internal server error')
+  next(err)
+})
+
 // 404 handler
 app.use((req, res) => {
   res.status(404).json({ error: 'Route not found' })
@@ -407,8 +433,10 @@ app.use((req, res) => {
 
 // Error handler
 app.use((err, req, res, next) => {
-  console.error(err.stack)
-  res.status(500).json({ error: 'Something went wrong' })
+  if (err.message !== 'Simulated internal server error') {
+    console.error(err.stack)
+  }
+  res.status(500).json({ error: 'Internal Server Error' })
 })
 
 if (require.main === module) {
