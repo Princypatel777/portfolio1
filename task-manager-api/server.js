@@ -1,5 +1,7 @@
+require('dotenv').config()
 const express = require('express')
 const mongoose = require('mongoose')
+const OpenAI = require('openai')
 const taskEvents = require('./events')
 const Task = require('./models/Task')
 require('./listeners')
@@ -7,6 +9,11 @@ require('./listeners')
 const app = express()
 const PORT = process.env.PORT || 5000
 const MONGO_URI = process.env.MONGO_URI || 'mongodb://mongodb:27017/taskdb'
+
+// AI Rate Limiting Tracker (Supplementary Problem 2: Max 5 requests per minute per client)
+const aiRateLimitMap = new Map()
+const AI_RATE_LIMIT_WINDOW_MS = 60 * 1000
+const AI_MAX_REQUESTS_PER_WINDOW = 5
 
 // In-memory fallback for standalone testing when MongoDB is not connected
 const tasks = []
@@ -102,6 +109,116 @@ async function validateTaskId(req, res, next) {
 }
 
 // ==================== Routes ====================
+
+// POST /api/ai/generate-description - AI Description Generator with Graceful Degradation
+app.post('/api/ai/generate-description', async (req, res) => {
+  const { title } = req.body
+
+  if (!title || typeof title !== 'string' || title.trim() === '') {
+    return res.status(400).json({ error: 'Task title is required to generate a description' })
+  }
+
+  const cleanTitle = title.trim()
+  const clientIp = req.ip || req.headers['x-forwarded-for'] || 'client-default'
+  const now = Date.now()
+
+  // 1. Rate Limiting Check (Supplementary Problem 2)
+  const timestamps = (aiRateLimitMap.get(clientIp) || []).filter((ts) => now - ts < AI_RATE_LIMIT_WINDOW_MS)
+  if (timestamps.length >= AI_MAX_REQUESTS_PER_WINDOW) {
+    return res.status(429).json({
+      error: 'Rate limit exceeded. Please wait a minute before requesting another AI description.',
+      rateLimited: true,
+    })
+  }
+  timestamps.push(now)
+  aiRateLimitMap.set(clientIp, timestamps)
+
+  // 2. Test Environment Predictable Handling
+  if (process.env.NODE_ENV === 'test' && !process.env.OPENAI_API_KEY && !process.env.GEMINI_API_KEY) {
+    return res.status(200).json({
+      description: `Task dedicated to: ${cleanTitle}. Verify all acceptance criteria and execute tasks in priority order.`,
+      fallback: false,
+      source: 'test-mock',
+    })
+  }
+
+  // 3. Try OpenAI API if Key is Configured
+  if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_key_here') {
+    try {
+      const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+      const completion = await openai.chat.completions.create({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a helpful task assistant. Provide a concise, professional 1-2 sentence description for a task based on its title.',
+          },
+          {
+            role: 'user',
+            content: `Write a short task description for: ${cleanTitle}`,
+          },
+        ],
+        max_tokens: 120,
+        temperature: 0.7,
+      })
+
+      const generated = completion.choices[0]?.message?.content?.trim()
+      if (generated) {
+        return res.status(200).json({
+          description: generated,
+          fallback: false,
+          source: 'openai',
+        })
+      }
+    } catch (err) {
+      console.warn(`[AI Service] OpenAI API error: ${err.message}. Engaging graceful fallback.`)
+    }
+  }
+
+  // 4. Try Google Gemini API if Key is Configured
+  if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_key_here') {
+    try {
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`
+      const geminiResponse = await fetch(geminiUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: `You are a helpful task assistant. Provide a concise, professional 1-2 sentence task description for: ${cleanTitle}`,
+                },
+              ],
+            },
+          ],
+        }),
+      })
+
+      if (geminiResponse.ok) {
+        const geminiData = await geminiResponse.json()
+        const text = geminiData.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
+        if (text) {
+          return res.status(200).json({
+            description: text,
+            fallback: false,
+            source: 'gemini',
+          })
+        }
+      }
+    } catch (err) {
+      console.warn(`[AI Service] Gemini API error: ${err.message}. Engaging graceful fallback.`)
+    }
+  }
+
+  // 5. Graceful Degradation Fallback (Core Requirement)
+  const fallbackText = `Coordinate and execute all planned action items for "${cleanTitle}". Review deliverables against project requirements.`
+  return res.status(200).json({
+    description: fallbackText,
+    fallback: true,
+    message: 'AI service temporarily unavailable. Provided intelligent fallback description.',
+  })
+})
 
 // GET /tasks - Retrieve all tasks
 app.get('/tasks', async (req, res) => {

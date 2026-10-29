@@ -20,8 +20,10 @@
   ],
   "license": "ISC",
   "dependencies": {
+    "dotenv": "^18.0.9",
     "express": "^5.1.0",
-    "mongoose": "^8.2.0"
+    "mongoose": "^8.2.0",
+    "openai": "^7.45.1"
   },
   "devDependencies": {
     "jest": "^30.5.2",

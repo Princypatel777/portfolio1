@@ -54,5 +54,50 @@ describe('Task Management API Endpoints', () => {
     expect(res.statusCode).toBe(200)
     expect(res.body).toHaveProperty('message', 'Task deleted')
   })
-})
 
+  describe('AI Description Generator (/api/ai/generate-description)', () => {
+    test('POST /api/ai/generate-description generates a description successfully', async () => {
+      const res = await request(app)
+        .post('/api/ai/generate-description')
+        .send({ title: 'Deploy Web Application' })
+        .set('Content-Type', 'application/json')
+
+      expect(res.statusCode).toBe(200)
+      expect(res.body).toHaveProperty('description')
+      expect(typeof res.body.description).toBe('string')
+      expect(res.body.description.length).toBeGreaterThan(0)
+    })
+
+    test('POST /api/ai/generate-description returns 400 when title is missing', async () => {
+      const res = await request(app)
+        .post('/api/ai/generate-description')
+        .send({})
+        .set('Content-Type', 'application/json')
+
+      expect(res.statusCode).toBe(400)
+      expect(res.body).toHaveProperty('error')
+    })
+
+    test('POST /api/ai/generate-description returns 429 when rate limit is exceeded', async () => {
+      // Simulate exceeding rate limit for a unique IP
+      const agent = request(app)
+      const testIp = '192.168.1.100'
+
+      for (let i = 0; i < 5; i++) {
+        await agent
+          .post('/api/ai/generate-description')
+          .set('x-forwarded-for', testIp)
+          .send({ title: 'Rate Limit Test Task' })
+      }
+
+      // 6th call from same IP in the same minute should be rejected
+      const rateLimitedRes = await agent
+        .post('/api/ai/generate-description')
+        .set('x-forwarded-for', testIp)
+        .send({ title: 'Rate Limit Test Task' })
+
+      expect(rateLimitedRes.statusCode).toBe(429)
+      expect(rateLimitedRes.body).toHaveProperty('rateLimited', true)
+    })
+  })
+})

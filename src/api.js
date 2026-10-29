@@ -55,16 +55,28 @@ export async function getTasks() {
 
 export async function createTask(task) {
   return (await request('/tasks', {
-    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(task),
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(task),
   })).task
 }
 
 export async function updateTask(id, task) {
   return (await request(`/tasks/${id}`, {
-    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(task),
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(task),
   })).task
 }
 
 export function deleteTask(id) {
   return request(`/tasks/${id}`, { method: 'DELETE' })
+}
+
+export async function generateTaskDescription(title) {
+  return request('/api/ai/generate-description', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ title }),
+  })
 }

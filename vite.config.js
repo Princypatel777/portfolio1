@@ -12,6 +12,10 @@ export default defineConfig({
         target: process.env.VITE_API_URL || 'http://localhost:5000',
         changeOrigin: true,
       },
+      '/api': {
+        target: process.env.VITE_API_URL || 'http://localhost:5000',
+        changeOrigin: true,
+      },
     },
   },
   preview: {
@@ -19,6 +23,10 @@ export default defineConfig({
     host: true,
     proxy: {
       '/tasks': {
+        target: process.env.VITE_API_URL || 'http://backend:5000',
+        changeOrigin: true,
+      },
+      '/api': {
         target: process.env.VITE_API_URL || 'http://backend:5000',
         changeOrigin: true,
       },
