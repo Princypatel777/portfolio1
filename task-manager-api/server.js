@@ -1,4 +1,7 @@
-require('dotenv').config()
+const path = require('path')
+require('dotenv').config({ path: path.join(__dirname, '.env') })
+require('dotenv').config({ path: path.join(__dirname, '.env.example') })
+require('dotenv').config({ path: path.join(__dirname, '../.env') })
 const express = require('express')
 const mongoose = require('mongoose')
 const OpenAI = require('openai')
@@ -133,14 +136,16 @@ app.post('/api/ai/generate-description', async (req, res) => {
   timestamps.push(now)
   aiRateLimitMap.set(clientIp, timestamps)
 
-  // 2. Test Environment Predictable Handling
-  if (process.env.NODE_ENV === 'test' && !process.env.OPENAI_API_KEY && !process.env.GEMINI_API_KEY) {
+  // 2. Test Environment Predictable Handling (prevents network timeouts in CI)
+  if (process.env.NODE_ENV === 'test' && process.env.ENABLE_LIVE_AI_TESTS !== 'true') {
     return res.status(200).json({
       description: `Task dedicated to: ${cleanTitle}. Verify all acceptance criteria and execute tasks in priority order.`,
       fallback: false,
       source: 'test-mock',
     })
   }
+
+  let lastErrorDetail = ''
 
   // 3. Try OpenAI API if Key is Configured
   if (process.env.OPENAI_API_KEY && process.env.OPENAI_API_KEY !== 'your_key_here') {
@@ -171,43 +176,53 @@ app.post('/api/ai/generate-description', async (req, res) => {
         })
       }
     } catch (err) {
+      lastErrorDetail = `OpenAI: ${err.message}`
       console.warn(`[AI Service] OpenAI API error: ${err.message}. Engaging graceful fallback.`)
     }
   }
 
   // 4. Try Google Gemini API if Key is Configured
   if (process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'your_key_here') {
-    try {
-      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`
-      const geminiResponse = await fetch(geminiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: `You are a helpful task assistant. Provide a concise, professional 1-2 sentence task description for: ${cleanTitle}`,
-                },
-              ],
-            },
-          ],
-        }),
-      })
+    const geminiModels = ['gemini-2.5-flash', 'gemini-1.5-flash', 'gemini-pro']
+    for (const model of geminiModels) {
+      try {
+        const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${process.env.GEMINI_API_KEY}`
+        const geminiResponse = await fetch(geminiUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              {
+                parts: [
+                  {
+                    text: `You are a helpful task assistant. Provide a concise, professional 1-2 sentence task description for: ${cleanTitle}`,
+                  },
+                ],
+              },
+            ],
+          }),
+        })
 
-      if (geminiResponse.ok) {
-        const geminiData = await geminiResponse.json()
-        const text = geminiData.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
-        if (text) {
-          return res.status(200).json({
-            description: text,
-            fallback: false,
-            source: 'gemini',
-          })
+        if (geminiResponse.ok) {
+          const geminiData = await geminiResponse.json()
+          const text = geminiData.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
+          if (text) {
+            return res.status(200).json({
+              description: text,
+              fallback: false,
+              source: `gemini (${model})`,
+            })
+          }
+        } else {
+          const errData = await geminiResponse.json().catch(() => ({}))
+          if (errData.error?.message) {
+            lastErrorDetail = `Gemini: ${errData.error.message}`
+          }
         }
+      } catch (err) {
+        lastErrorDetail = `Gemini: ${err.message}`
+        console.warn(`[AI Service] Gemini API error: ${err.message}. Engaging graceful fallback.`)
       }
-    } catch (err) {
-      console.warn(`[AI Service] Gemini API error: ${err.message}. Engaging graceful fallback.`)
     }
   }
 
@@ -216,7 +231,9 @@ app.post('/api/ai/generate-description', async (req, res) => {
   return res.status(200).json({
     description: fallbackText,
     fallback: true,
-    message: 'AI service temporarily unavailable. Provided intelligent fallback description.',
+    message: lastErrorDetail
+      ? `AI notice: ${lastErrorDetail}`
+      : 'AI service temporarily unavailable or key not configured. Provided intelligent fallback description.',
   })
 })
 

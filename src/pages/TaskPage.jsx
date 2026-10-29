@@ -46,7 +46,7 @@ export default function TaskPage() {
       if (data && data.description) {
         setDescription(data.description)
         if (data.fallback) {
-          setAiNotice('ℹ️ Fallback description used (AI service unavailable or key not configured). Feel free to customize.')
+          setAiNotice(data.message || 'ℹ️ Fallback description used (AI service unavailable or key not configured). Feel free to customize.')
         } else {
           setAiNotice('✨ AI-generated suggestion loaded! You can modify it before saving.')
         }
