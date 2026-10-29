@@ -113,6 +113,38 @@ async function validateTaskId(req, res, next) {
 
 // ==================== Routes ====================
 
+// Helper to generate domain-aware fallback and metadata for Practical 13
+function getFallbackDetails(taskTitle) {
+  const lower = taskTitle.toLowerCase()
+  let desc = `Coordinate and execute all planned action items, unit tests, and validation for "${taskTitle}".`
+  let priority = 'medium'
+  let category = 'General'
+
+  if (lower.includes('jwt') || lower.includes('auth') || lower.includes('security') || lower.includes('login')) {
+    desc = `Implement secure authentication workflows, credential hashing, session tokens, and route protection for "${taskTitle}".`
+    priority = 'high'
+    category = 'Learning'
+  } else if (lower.includes('database') || lower.includes('mongo') || lower.includes('sql') || lower.includes('backend')) {
+    desc = `Design schema architectures, database connections, query optimizations, and endpoint controllers for "${taskTitle}".`
+    priority = 'high'
+    category = 'Backend'
+  } else if (lower.includes('docker') || lower.includes('ci') || lower.includes('cd') || lower.includes('pipeline') || lower.includes('deploy')) {
+    desc = `Configure container environments, orchestration scripts, and automated build pipelines for "${taskTitle}".`
+    priority = 'medium'
+    category = 'DevOps'
+  } else if (lower.includes('ui') || lower.includes('frontend') || lower.includes('react') || lower.includes('css')) {
+    desc = `Develop responsive component layouts, user state handling, and interactive accessibility for "${taskTitle}".`
+    priority = 'medium'
+    category = 'Frontend'
+  } else if (lower.includes('test') || lower.includes('jest') || lower.includes('bug') || lower.includes('fix')) {
+    desc = `Write comprehensive test suites, reproduce reported defects, and verify test assertions for "${taskTitle}".`
+    priority = 'high'
+    category = 'Quality Assurance'
+  }
+
+  return { desc, priority, category }
+}
+
 // POST /api/ai/generate-description - AI Description Generator with Graceful Degradation
 app.post('/api/ai/generate-description', async (req, res) => {
   const { title } = req.body
@@ -122,6 +154,7 @@ app.post('/api/ai/generate-description', async (req, res) => {
   }
 
   const cleanTitle = title.trim()
+  const fallbackInfo = getFallbackDetails(cleanTitle)
   const clientIp = req.ip || req.headers['x-forwarded-for'] || 'client-default'
   const now = Date.now()
 
@@ -139,9 +172,12 @@ app.post('/api/ai/generate-description', async (req, res) => {
   // 2. Test Environment Predictable Handling (prevents network timeouts in CI)
   if (process.env.NODE_ENV === 'test' && process.env.ENABLE_LIVE_AI_TESTS !== 'true') {
     return res.status(200).json({
-      description: `Task dedicated to: ${cleanTitle}. Verify all acceptance criteria and execute tasks in priority order.`,
-      fallback: false,
+      description: fallbackInfo.desc,
+      suggestedPriority: fallbackInfo.priority,
+      suggestedCategory: fallbackInfo.category,
       source: 'test-mock',
+      fallback: false,
+      disclaimer: 'This suggestion was generated locally (Responsible AI graceful degradation). Review before saving.',
     })
   }
 
@@ -171,8 +207,11 @@ app.post('/api/ai/generate-description', async (req, res) => {
       if (generated) {
         return res.status(200).json({
           description: generated,
-          fallback: false,
+          suggestedPriority: fallbackInfo.priority,
+          suggestedCategory: fallbackInfo.category,
           source: 'openai',
+          fallback: false,
+          disclaimer: 'AI-generated suggestion via OpenAI. Review before saving.',
         })
       }
     } catch (err) {
@@ -209,8 +248,11 @@ app.post('/api/ai/generate-description', async (req, res) => {
           if (text) {
             return res.status(200).json({
               description: text,
-              fallback: false,
+              suggestedPriority: fallbackInfo.priority,
+              suggestedCategory: fallbackInfo.category,
               source: `gemini (${model})`,
+              fallback: false,
+              disclaimer: 'AI-generated suggestion via Google Gemini. Review before saving.',
             })
           }
         } else {
@@ -227,13 +269,13 @@ app.post('/api/ai/generate-description', async (req, res) => {
   }
 
   // 5. Graceful Degradation Fallback (Core Requirement)
-  const fallbackText = `Coordinate and execute all planned action items for "${cleanTitle}". Review deliverables against project requirements.`
   return res.status(200).json({
-    description: fallbackText,
+    description: fallbackInfo.desc,
+    suggestedPriority: fallbackInfo.priority,
+    suggestedCategory: fallbackInfo.category,
+    source: 'graceful-fallback',
     fallback: true,
-    message: lastErrorDetail
-      ? `AI notice: ${lastErrorDetail}`
-      : 'AI service temporarily unavailable or key not configured. Provided intelligent fallback description.',
+    disclaimer: 'This suggestion was generated locally (Responsible AI graceful degradation). Review before saving.',
   })
 })
 
